@@ -293,6 +293,9 @@ namespace SmartHome.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("OwnerId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("RoomId")
                         .HasColumnType("int");
 

@@ -1,0 +1,42 @@
+name: Проверка умного дома
+on:
+  push:
+    branches: [доступ-и-сценарии]
+  pull_request:
+    branches: [feature/guest-creation]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  acceptance:
+    name: Сборка и проверка сценариев
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Сборка приложения
+        run: dotnet build SmartHome/SmartHome.csproj --configuration Release
+      - name: Проверка работы приложения с SQL Server LocalDB
+        shell: pwsh
+        env:
+          PYTHONUTF8: '1'
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: http://127.0.0.1:5193
+          ConnectionStrings__DefaultConnection: 'Server=(localdb)\MSSQLLocalDB;Database=SmartHomeAcceptance;Integrated Security=true;TrustServerCertificate=true'
+        run: |
+          sqllocaldb start MSSQLLocalDB
+          $app = Start-Process dotnet -WorkingDirectory SmartHome -ArgumentList 'bin/Release/net8.0/SmartHome.dll' -PassThru -RedirectStandardOutput app.log -RedirectStandardError errors.log
+          try {
+            foreach ($attempt in 1..60) {
+              if ($app.HasExited) { throw "Приложение завершило работу при запуске" }
+              try { Invoke-WebRequest http://127.0.0.1:5193/Account/Login | Out-Null; break } catch { Start-Sleep 1 }
+            }
+            python tests/check_smarthome.py http://127.0.0.1:5193
+            if ($LASTEXITCODE) { throw "Проверка приложения завершилась ошибкой" }
+          } finally {
+            if (!$app.HasExited) { Stop-Process -Id $app.Id }
+            Get-Content app.log,errors.log -Tail 35
+          }

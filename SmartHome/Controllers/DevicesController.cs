@@ -9,7 +9,7 @@ using SmartHome.Domain.Enums;
 
 namespace SmartHome.Controllers
 {
-    [Authorize]
+    [Authorize(Roles = "Owner,Guest")]
     public class DevicesController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -22,29 +22,28 @@ namespace SmartHome.Controllers
         // GET: Devices
         public async Task<IActionResult> Index()
         {
-            int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-            var role = User.FindFirstValue(ClaimTypes.Role);
+            return View(await AccessibleDevices().Include(d => d.Room).ToListAsync());
+        }
 
-            IQueryable<Device> devicesQuery = _context.Devices
-                .Include(d => d.Room)
-                .Where(d => d.Status != DeviceStatus.Decommissioned);
+        private IQueryable<Device> AccessibleDevices()
+        {
+            int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var devices = _context.Devices.Where(d => d.Status != DeviceStatus.Decommissioned);
+            if (User.IsInRole("Owner"))
+                return devices.Where(d => d.OwnerId == userId);
 
-            if (role == "Owner")
-            {
-                devicesQuery = devicesQuery.Where(d => d.OwnerId == userId);
-            }
-            else if (role == "Guest")
-            {
-                var permissions = await _context.GuestPermissions
-                    .Where(p => p.GuestId == userId && p.Status == PermissionStatus.Active && p.ExpiresAt > DateTime.UtcNow)
-                    .ToListAsync();
-
-                var allowedDeviceIds = permissions.SelectMany(p => p.AllowedDeviceIds).Distinct().ToList();
-                devicesQuery = devicesQuery.Where(d => allowedDeviceIds.Contains(d.Id));
-            }
-
-            var devices = await devicesQuery.ToListAsync();
-            return View(devices);
+            // В каждом гостевом разрешении номера доступных устройств хранятся в массиве JSON.
+            return _context.Devices.FromSqlInterpolated($"""
+                SELECT d.* FROM Devices AS d
+                WHERE d.Status <> {(int)DeviceStatus.Decommissioned}
+                  AND EXISTS (
+                      SELECT 1 FROM GuestPermissions AS p
+                      CROSS APPLY OPENJSON(p.AllowedDeviceIds) WITH (DeviceId int '$') AS allowed
+                      WHERE p.OwnerId = d.OwnerId AND p.GuestId = {userId}
+                        AND p.Status = {(int)PermissionStatus.Active}
+                        AND p.ExpiresAt > SYSUTCDATETIME() AND allowed.DeviceId = d.Id
+                  )
+                """);
         }
 
         // GET: Devices/Create
@@ -71,6 +70,9 @@ namespace SmartHome.Controllers
             ModelState.Remove("OwnerId");
             ModelState.Remove("CreatedAt");
             ModelState.Remove("UpdateAt");
+
+            if (device.RoomId.HasValue && !await _context.Rooms.AnyAsync(r => r.Id == device.RoomId && r.OwnerId == ownerId))
+                ModelState.AddModelError("RoomId", "Выберите помещение своего дома.");
 
             if (ModelState.IsValid)
             {
@@ -110,45 +112,15 @@ namespace SmartHome.Controllers
         public async Task<IActionResult> TogglePower(int id)
         {
             int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-            var role = User.FindFirstValue(ClaimTypes.Role);
-
-            var device = await _context.Devices.FirstOrDefaultAsync(d => d.Id == id);
-
+            await using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            var device = await AccessibleDevices().FirstOrDefaultAsync(d => d.Id == id);
             if (device == null) return NotFound();
-
-            if (role == "Guest")
-            {
-                var permission = await _context.GuestPermissions
-                    .FirstOrDefaultAsync(p => p.GuestId == userId && p.OwnerId == device.OwnerId);
-
-                if (permission == null || !permission.Allows(device.Id))
-                {
-                    TempData["Error"] = "Доступ к устройству запрещен или истек";
-
-                    _context.EventLogs.Add(new EventLog
-                    {
-                        Timestamp = DateTime.UtcNow,
-                        EventType = EventType.Warning,
-                        Source = "DevicesController",
-                        Description = $"Попытка несанкционированного управления устройством {device.Name}",
-                        UserId = userId,
-                        DeviceId = device.Id
-                    });
-                    await _context.SaveChangesAsync();
-                    return RedirectToAction(nameof(Index));
-                }
-            }
-            else if (role == "Owner" && device.OwnerId != userId)
-            {
-                return NotFound();
-            }
 
             if (device.Status == DeviceStatus.Active)
             {
                 bool success = device.ApplyCommand("Toggle");
                 if (success)
                 {
-                    await _context.SaveChangesAsync();
                     _context.EventLogs.Add(new EventLog
                     {
                         Timestamp = DateTime.UtcNow,
@@ -162,6 +134,7 @@ namespace SmartHome.Controllers
                 }
             }
 
+            await transaction.CommitAsync();
             return RedirectToAction(nameof(Index));
         }
 

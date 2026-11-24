@@ -35,7 +35,8 @@ else
                 <tr>
                     <td>@(guests.ContainsKey(item.GuestId) ? guests[item.GuestId] : "Неизвестно")</td>
                     <td>
-                        @switch (item.Status)
+                        @switch (item.Status == SmartHome.Domain.Enums.PermissionStatus.Active && item.ExpiresAt <= DateTime.UtcNow
+                            ? SmartHome.Domain.Enums.PermissionStatus.Expired : item.Status)
                         {
                             case SmartHome.Domain.Enums.PermissionStatus.Active:
                                 <span class="badge bg-success">Активно</span>
