@@ -119,10 +119,19 @@ namespace SmartHome.Controllers
         {
             int ownerId = GetCurrentUserId();
 
-            if (guestId == 0)
+            if (!await _context.Users.AnyAsync(u => u.Id == guestId && u.Role == UserRole.Guest && u.IsActive))
             {
                 ModelState.AddModelError("", "Выберите гостя");
             }
+
+            var ids = selectedDeviceIds.Distinct().ToList();
+            if (ids.Count == 0 || await _context.Devices.CountAsync(d => ids.Contains(d.Id)
+                && d.OwnerId == ownerId && d.Status != DeviceStatus.Decommissioned) != ids.Count)
+                ModelState.AddModelError("", "Выберите устройства своего дома.");
+
+            expiresAt = expiresAt.ToUniversalTime();
+            if (expiresAt <= DateTime.UtcNow)
+                ModelState.AddModelError("", "Срок доступа должен быть в будущем.");
 
             if (ModelState.IsValid)
             {
@@ -132,7 +141,7 @@ namespace SmartHome.Controllers
                     GuestId = guestId,
                     ExpiresAt = expiresAt,
                     Status = PermissionStatus.Active,
-                    AllowedDeviceIds = selectedDeviceIds ?? new List<int>()
+                    AllowedDeviceIds = ids
                 };
 
                 _context.GuestPermissions.Add(permission);

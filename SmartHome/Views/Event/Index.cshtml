@@ -1,0 +1,27 @@
+@model IEnumerable<SmartHome.Domain.Entities.EventLog>
+@{
+    ViewData["Title"] = "Журнал событий";
+}
+<h1>Журнал событий</h1>
+<form asp-action="Index" method="get" class="d-flex align-items-end gap-2 mb-3">
+    <label>С (UTC)<input type="date" name="from" value="@ViewBag.From" class="form-control" /></label>
+    <label>По (UTC)<input type="date" name="to" value="@ViewBag.To" class="form-control" /></label>
+    <button class="btn btn-primary">Показать</button>
+</form>
+<div asp-validation-summary="All" class="text-danger"></div>
+@if (!Model.Any())
+{
+    <p>За этот период событий нет.</p>
+}
+else
+{
+    <table class="table">
+        <thead><tr><th>Время (UTC)</th><th>Источник</th><th>Событие</th></tr></thead>
+        <tbody>
+        @foreach (var item in Model)
+        {
+            <tr><td>@item.Timestamp.ToString("dd.MM.yyyy HH:mm:ss")</td><td>@item.Source</td><td>@item.Description</td></tr>
+        }
+        </tbody>
+    </table>
+}

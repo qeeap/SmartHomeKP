@@ -29,11 +29,10 @@ namespace SmartHome.Controllers
         {
             int ownerId = GetCurrentUserId();
 
-            // Загружаем датчики, которые принадлежат комнатам этого владельца (или без комнаты)
             var sensors = await _context.Sensors
                 .Include(s => s.Room)
                 .Include(s => s.Readings.OrderByDescending(r => r.Timestamp).Take(5))
-                .Where(s => (s.Room != null && s.Room.OwnerId == ownerId) || s.RoomId == null)
+                .Where(s => s.OwnerId == ownerId)
                 .ToListAsync();
 
             return View(sensors);
@@ -58,8 +57,12 @@ namespace SmartHome.Controllers
         {
             int ownerId = GetCurrentUserId();
 
+            if (sensor.RoomId.HasValue && !await _context.Rooms.AnyAsync(r => r.Id == sensor.RoomId && r.OwnerId == ownerId))
+                ModelState.AddModelError("RoomId", "Выберите помещение своего дома.");
+
             if (ModelState.IsValid)
             {
+                sensor.OwnerId = ownerId;
                 sensor.InstalledAt = DateTime.UtcNow;
                 sensor.IsActive = true;
 
@@ -94,7 +97,7 @@ namespace SmartHome.Controllers
             int ownerId = GetCurrentUserId();
             var sensor = await _context.Sensors
                 .Include(s => s.Room)
-                .FirstOrDefaultAsync(s => s.Id == id && (s.Room.OwnerId == ownerId || s.RoomId == null));
+                .FirstOrDefaultAsync(s => s.Id == id && s.OwnerId == ownerId);
 
             if (sensor != null)
             {
@@ -122,14 +125,17 @@ namespace SmartHome.Controllers
 
         // POST: Sensor/SimulateReading
         [HttpPost]
-        public async Task<IActionResult> SimulateReading(int sensorId, double value)
+        public async Task<IActionResult> SimulateReading(int sensorId, double? value)
         {
             int ownerId = GetCurrentUserId();
             var sensor = await _context.Sensors
                 .Include(s => s.Room)
-                .FirstOrDefaultAsync(s => s.Id == sensorId && (s.Room.OwnerId == ownerId || s.RoomId == null));
+                .FirstOrDefaultAsync(s => s.Id == sensorId && s.OwnerId == ownerId);
 
             if (sensor == null) return NotFound();
+
+            if (!ModelState.IsValid || value == null || !double.IsFinite(value.Value))
+                return BadRequest("Введите конечное числовое показание.");
 
             if (!sensor.IsActive)
             {
@@ -141,7 +147,7 @@ namespace SmartHome.Controllers
             var reading = new SensorReading
             {
                 SensorId = sensor.Id,
-                Value = value,
+                Value = value.Value,
                 Unit = sensor.Unit,
                 Timestamp = DateTime.UtcNow
             };
@@ -157,7 +163,6 @@ namespace SmartHome.Controllers
                 UserId = ownerId,
                 SensorId = sensor.Id
             });
-            await _context.SaveChangesAsync();
 
             // 3. ПРОВЕРКА СЦЕНАРИЕВ (Scenario Engine)
             var activeScenarios = await _context.Scenarios
@@ -170,12 +175,12 @@ namespace SmartHome.Controllers
             {
                 // Проверяем, есть ли триггер на этот датчик
                 var trigger = scenario.Triggers.FirstOrDefault(t => t.SensorId == sensor.Id);
-                if (trigger != null && trigger.CheckCondition(value))
+                if (trigger != null && trigger.CheckCondition(value.Value))
                 {
                     // Условие выполнено! Выполняем действия
                     foreach (var action in scenario.Actions)
                     {
-                        var device = await _context.Devices.FirstOrDefaultAsync(d => d.Id == action.DeviceId);
+                        var device = await _context.Devices.FirstOrDefaultAsync(d => d.Id == action.DeviceId && d.OwnerId == ownerId);
                         if (device != null && device.Status == DeviceStatus.Active)
                         {
                             // Выполняем команду над устройством
