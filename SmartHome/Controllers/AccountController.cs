@@ -69,7 +69,7 @@ namespace SmartHome.Controllers
 
                 await Authenticate(user);
 
-                return RedirectToAction("Index", "Home");
+                return RedirectToAction("Index", "Devices");
             }
             return View(model);
         }

@@ -6,14 +6,14 @@ using SmartHome.Domain.Entities;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Настройка БД (Entity Framework Core)
+// 1. ГЌГ Г±ГІГ°Г®Г©ГЄГ  ГЃГ„ (Entity Framework Core)
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2. Регистрация сервиса хэширования паролей (ИСПРАВЛЕНИЕ ОШИБКИ 500)
+// 2. ГђГҐГЈГЁГ±ГІГ°Г Г¶ГЁГї Г±ГҐГ°ГўГЁГ±Г  ГµГЅГёГЁГ°Г®ГўГ Г­ГЁГї ГЇГ Г°Г®Г«ГҐГ© (Г€Г‘ГЏГђГЂГ‚Г‹Г…ГЌГ€Г… ГЋГГ€ГЃГЉГ€ 500)
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
-// 3. Настройка Cookie-аутентификации
+// 3. ГЌГ Г±ГІГ°Г®Г©ГЄГ  Cookie-Г ГіГІГҐГ­ГІГЁГґГЁГЄГ Г¶ГЁГЁ
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -30,7 +30,7 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
+    app.UseExceptionHandler(error => error.Run(context => Results.Problem().ExecuteAsync(context)));
     app.UseHsts();
 }
 
@@ -39,12 +39,12 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-// 4. Middleware аутентификации и авторизации (строго в этом порядке!)
+// 4. Middleware Г ГіГІГҐГ­ГІГЁГґГЁГЄГ Г¶ГЁГЁ ГЁ Г ГўГІГ®Г°ГЁГ§Г Г¶ГЁГЁ (Г±ГІГ°Г®ГЈГ® Гў ГЅГІГ®Г¬ ГЇГ®Г°ГїГ¤ГЄГҐ!)
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+    pattern: "{controller=Devices}/{action=Index}/{id?}");
 
 app.Run();
