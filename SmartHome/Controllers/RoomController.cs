@@ -30,8 +30,8 @@ namespace SmartHome.Controllers
 
             // Загружаем комнаты вместе с устройствами и датчиками для подсчета
             var rooms = await _context.Rooms
-                .Include(r => r.Devices)
-                .Include(r => r.Sensors)
+                .Include(r => r.Devices.Where(d => d.OwnerId == ownerId))
+                .Include(r => r.Sensors.Where(s => s.OwnerId == ownerId))
                 .Where(r => r.OwnerId == ownerId)
                 .ToListAsync();
 

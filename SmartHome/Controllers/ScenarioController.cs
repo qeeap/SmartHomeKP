@@ -45,11 +45,11 @@ namespace SmartHome.Controllers
             int ownerId = GetCurrentUserId();
 
             ViewBag.Sensors = new SelectList(
-                await _context.Sensors.Where(s => s.Room.OwnerId == ownerId || s.RoomId == null).ToListAsync(),
+                await _context.Sensors.Where(s => s.OwnerId == ownerId && s.IsActive).ToListAsync(),
                 "Id", "Name");
 
             ViewBag.Devices = new SelectList(
-                await _context.Devices.Where(d => d.OwnerId == ownerId && d.Status != DeviceStatus.Decommissioned).ToListAsync(),
+                await _context.Devices.Where(d => d.OwnerId == ownerId && d.Status == DeviceStatus.Active).ToListAsync(),
                 "Id", "Name");
 
             return View();
@@ -57,13 +57,16 @@ namespace SmartHome.Controllers
 
         // POST: Scenario/Create
         [HttpPost]
-        public async Task<IActionResult> Create(string name, string description, int sensorId, string op, double threshold, int deviceId, string commandType)
+        public async Task<IActionResult> Create(string name, string? description, int sensorId, string op, double? threshold, int deviceId, string commandType)
         {
             int ownerId = GetCurrentUserId();
 
-            if (string.IsNullOrWhiteSpace(name) || sensorId == 0 || deviceId == 0)
+            if (!ModelState.IsValid || string.IsNullOrWhiteSpace(name) || threshold == null || !double.IsFinite(threshold.Value)
+                || op is not (">" or "<" or ">=" or "<=" or "==") || commandType is not ("On" or "Off" or "Toggle")
+                || !await _context.Sensors.AnyAsync(s => s.Id == sensorId && s.OwnerId == ownerId && s.IsActive)
+                || !await _context.Devices.AnyAsync(d => d.Id == deviceId && d.OwnerId == ownerId && d.Status == DeviceStatus.Active))
             {
-                ModelState.AddModelError("", "Заполните все обязательные поля");
+                ModelState.AddModelError("", "Проверьте датчик, устройство, условие и порог.");
                 return await ReloadCreateView(ownerId);
             }
 
@@ -77,6 +80,7 @@ namespace SmartHome.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
+            await using var transaction = await _context.Database.BeginTransactionAsync();
             _context.Scenarios.Add(scenario);
             await _context.SaveChangesAsync();
 
@@ -86,7 +90,7 @@ namespace SmartHome.Controllers
                 ScenarioId = scenario.Id,
                 SensorId = sensorId,
                 Operator = op,
-                Threshold = threshold,
+                Threshold = threshold.Value,
                 Type = "Sensor"
             };
             _context.Triggers.Add(trigger);
@@ -115,6 +119,7 @@ namespace SmartHome.Controllers
             });
             await _context.SaveChangesAsync();
 
+            await transaction.CommitAsync();
             return RedirectToAction(nameof(Index));
         }
 
@@ -152,10 +157,10 @@ namespace SmartHome.Controllers
         private async Task<IActionResult> ReloadCreateView(int ownerId)
         {
             ViewBag.Sensors = new SelectList(
-                await _context.Sensors.Where(s => s.Room.OwnerId == ownerId || s.RoomId == null).ToListAsync(),
+                await _context.Sensors.Where(s => s.OwnerId == ownerId && s.IsActive).ToListAsync(),
                 "Id", "Name");
             ViewBag.Devices = new SelectList(
-                await _context.Devices.Where(d => d.OwnerId == ownerId && d.Status != DeviceStatus.Decommissioned).ToListAsync(),
+                await _context.Devices.Where(d => d.OwnerId == ownerId && d.Status == DeviceStatus.Active).ToListAsync(),
                 "Id", "Name");
             return View();
         }
