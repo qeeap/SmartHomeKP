@@ -1,4 +1,6 @@
 ﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
+using SmartHome.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -14,9 +16,12 @@ namespace SmartHome.Controllers
     {
         private readonly ApplicationDbContext _context;
 
-        public GuestPermissionController(ApplicationDbContext context)
+        private readonly IPasswordHasher<User> _passwordHasher;
+
+        public GuestPermissionController(ApplicationDbContext context, IPasswordHasher<User> passwordHasher)
         {
             _context = context;
+            _passwordHasher = passwordHasher;
         }
 
         private int GetCurrentUserId()
@@ -48,14 +53,58 @@ namespace SmartHome.Controllers
             return View(permissions);
         }
 
+        [HttpGet]
+        public IActionResult CreateGuest()
+        {
+            return View(new RegisterViewModel());
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateGuest(RegisterViewModel model)
+        {
+            if (!ModelState.IsValid)
+                return View(model);
+
+            if (await _context.Users.AnyAsync(u => u.Login == model.Login))
+            {
+                ModelState.AddModelError(nameof(model.Login), "Этот логин уже занят");
+                return View(model);
+            }
+
+            var guest = new User
+            {
+                Login = model.Login,
+                FullName = model.FullName,
+                Email = model.Email,
+                Role = UserRole.Guest,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            guest.PasswordHash = _passwordHasher.HashPassword(guest, model.Password);
+            _context.Users.Add(guest);
+            _context.EventLogs.Add(new EventLog
+            {
+                Timestamp = DateTime.UtcNow,
+                EventType = EventType.Info,
+                Source = nameof(GuestPermissionController),
+                Description = $"Создана учетная запись гостя {guest.Login}",
+                UserId = GetCurrentUserId()
+            });
+
+            await _context.SaveChangesAsync();
+            return RedirectToAction(nameof(Create), new { guestId = guest.Id });
+        }
+
         // GET: GuestPermission/Create
-        public async Task<IActionResult> Create()
+        public async Task<IActionResult> Create(int? guestId)
         {
             int ownerId = GetCurrentUserId();
 
             ViewBag.Guests = new SelectList(
                 await _context.Users.Where(u => u.Role == UserRole.Guest).ToListAsync(),
-                "Id", "Login");
+                "Id", "Login", guestId);
 
             ViewBag.Devices = await _context.Devices
                 .Where(d => d.OwnerId == ownerId && d.Status != DeviceStatus.Decommissioned)
