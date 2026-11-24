@@ -2,6 +2,8 @@ name: SmartHome acceptance
 on:
   push:
     branches: [feature/smarthome-checklist]
+  pull_request:
+    branches: [feature/guest-creation]
   workflow_dispatch:
 permissions:
   contents: read
