@@ -1,0 +1,63 @@
+﻿@model SmartHome.Domain.Entities.Device
+@{
+    ViewData["Title"] = "Добавить устройство";
+}
+
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Добавление нового устройства</h4>
+            </div>
+            <div class="card-body">
+                <form asp-action="Create" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Name" class="form-label">Название устройства</label>
+                        <input asp-for="Name" class="form-control" placeholder="Например: Люстра в гостиной" required />
+                        <span asp-validation-for="Name" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Type" class="form-label">Тип устройства</label>
+                        <select asp-for="Type" class="form-select" required>
+                            <option value="">-- Выберите тип --</option>
+                            <option value="Освещение">Освещение</option>
+                            <option value="Климат-контроль">Климат-контроль</option>
+                            <option value="Безопасность">Безопасность</option>
+                            <option value="Розетка">Розетка</option>
+                            <option value="Бытовая техника">Бытовая техника</option>
+                        </select>
+                        <span asp-validation-for="Type" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Model" class="form-label">Модель</label>
+                        <input asp-for="Model" class="form-control" placeholder="Например: Xiaomi Smart Bulb" required />
+                        <span asp-validation-for="Model" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="RoomId" class="form-label">Помещение</label>
+                        <select asp-for="RoomId" class="form-select" asp-items="ViewBag.Rooms">
+                            <option value="">-- Не привязано к комнате --</option>
+                        </select>
+                        <span asp-validation-for="RoomId" class="text-danger"></span>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a asp-action="Index" class="btn btn-outline-secondary">Назад к списку</a>
+                        <button type="submit" class="btn btn-success px-4">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

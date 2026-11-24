@@ -1,0 +1,28 @@
+﻿@model SmartHome.Domain.Entities.Room
+@{
+    ViewData["Title"] = "Удалить помещение";
+}
+
+<div class="row justify-content-center mt-4">
+    <div class="col-md-6">
+        <div class="card border-danger shadow">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">Удаление помещения</h4>
+            </div>
+            <div class="card-body">
+                <h5 class="card-title">Вы уверены, что хотите удалить "@Model.Name"?</h5>
+                <p class="text-muted">
+                    Внимание: все устройства и датчики, привязанные к этой комнате, не будут удалены.
+                    Они просто останутся без привязки к помещению.
+                </p>
+                <form asp-action="Delete" method="post">
+                    <input type="hidden" asp-for="Id" />
+                    <div class="d-flex justify-content-between mt-4">
+                        <a asp-action="Index" class="btn btn-outline-secondary">Отмена</a>
+                        <button type="submit" class="btn btn-danger px-4">Удалить комнату</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

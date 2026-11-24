@@ -1,0 +1,72 @@
+﻿@model IEnumerable<SmartHome.Domain.Entities.GuestPermission>
+@{
+    ViewData["Title"] = "Гостевой доступ";
+}
+@{
+    var guests = ViewBag.Guests as Dictionary<int, string>;
+    var devices = ViewBag.Devices as Dictionary<int, string>;
+}
+
+<h2>Управление гостевым доступом</h2>
+<p><a asp-action="Create" class="btn btn-primary">Выдать новое разрешение</a></p>
+
+<table class="table table-hover table-bordered mt-3">
+    <thead class="table-dark">
+        <tr>
+            <th>Гость</th>
+            <th>Статус</th>
+            <th>Действует до</th>
+            <th>Разрешенные устройства</th>
+            <th>Действия</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>@(guests?.ContainsKey(item.GuestId) == true ? guests[item.GuestId] : "Неизвестно")</td>
+                <td>
+                    @switch (item.Status)
+                    {
+                        case SmartHome.Domain.Enums.PermissionStatus.Active:
+                            <span class="badge bg-success">Активно</span>
+                            break;
+                        case SmartHome.Domain.Enums.PermissionStatus.Suspended:
+                            <span class="badge bg-warning text-dark">Приостановлено</span>
+                            break;
+                        case SmartHome.Domain.Enums.PermissionStatus.Expired:
+                            <span class="badge bg-secondary">Истекло</span>
+                            break;
+                        case SmartHome.Domain.Enums.PermissionStatus.Revoked:
+                            <span class="badge bg-danger">Отозвано</span>
+                            break;
+                    }
+                </td>
+                <td>@item.ExpiresAt.ToString("dd.MM.yyyy HH:mm")</td>
+                <td>
+                    @foreach (var devId in item.AllowedDeviceIds)
+                    {
+                        if (devices?.ContainsKey(devId) == true)
+                        {
+                            <span class="badge bg-info text-dark">@devices[devId]</span>
+                        }
+                    }
+                </td>
+                <td>
+                    <form asp-action="Suspend" asp-route-id="@item.Id" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-sm btn-warning" title="Приостановить">⏸</button>
+                    </form>
+                    <form asp-action="Resume" asp-route-id="@item.Id" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-sm btn-success" title="Возобновить">▶</button>
+                    </form>
+                    <form asp-action="Revoke" asp-route-id="@item.Id" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-sm btn-danger" title="Отозвать">✖</button>
+                    </form>
+                    <form asp-action="Renew" asp-route-id="@item.Id" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-sm btn-primary" title="Продлить на 7 дней">🔄</button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

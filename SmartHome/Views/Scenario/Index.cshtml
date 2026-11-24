@@ -1,0 +1,51 @@
+﻿@model IEnumerable<SmartHome.Domain.Entities.Scenario>
+@using SmartHome.Domain.Entities
+@{
+    ViewData["Title"] = "Сценарии";
+}
+
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+    <h2>Мои сценарии</h2>
+    <a asp-action="Create" class="btn btn-primary">+ Создать сценарий</a>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info text-center">У вас пока нет сценариев автоматизации.</div>
+}
+else
+{
+    <div class="row row-cols-1 row-cols-md-2 g-4">
+        @foreach (var scenario in Model)
+        {
+            var trigger = scenario.Triggers.FirstOrDefault();
+            var action = scenario.Actions.FirstOrDefault();
+
+            <div class="col">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header d-flex justify-content-between align-items-center @(scenario.Status == SmartHome.Domain.Enums.ScenarioStatus.Active ? "bg-success text-white" : "bg-secondary text-white")">
+                        <h5 class="mb-0">@scenario.Name</h5>
+                        <span class="badge bg-light text-dark">@scenario.Status</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-2">@scenario.Description</p>
+                        @if (trigger != null)
+                        {
+                            <p class="mb-1"><strong>Условие:</strong> Датчик ID=@trigger.SensorId @trigger.Operator @trigger.Threshold</p>
+                        }
+                        @if (action != null)
+                        {
+                            <p class="mb-3"><strong>Действие:</strong> Устройство ID=@action.DeviceId -> @action.Type</p>
+                        }
+
+                        <form asp-action="ToggleStatus" asp-route-id="@scenario.Id" method="post">
+                            <button type="submit" class="btn w-100 @(scenario.Status == SmartHome.Domain.Enums.ScenarioStatus.Active ? "btn-outline-danger" : "btn-outline-success")">
+                                @(scenario.Status == SmartHome.Domain.Enums.ScenarioStatus.Active ? "Отключить сценарий" : "Включить сценарий")
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
