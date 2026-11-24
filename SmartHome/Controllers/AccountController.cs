@@ -45,7 +45,7 @@ namespace SmartHome.Controllers
                     Login = model.Login,
                     Email = model.Email,
                     FullName = model.FullName,
-                    Role = model.Role,
+                    Role = UserRole.Owner,
                     CreatedAt = DateTime.UtcNow,
                     IsActive = true
                 };

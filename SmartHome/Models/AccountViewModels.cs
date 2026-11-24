@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using SmartHome.Domain.Enums;
 
 namespace SmartHome.Models
 {
@@ -19,8 +18,6 @@ namespace SmartHome.Models
         [Required(ErrorMessage = "Введите ФИО")]
         public string FullName { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Выберите роль")]
-        public UserRole Role { get; set; }
     }
 
     public class LoginViewModel
